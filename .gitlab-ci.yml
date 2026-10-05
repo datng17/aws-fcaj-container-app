@@ -1,7 +1,4 @@
 # GitLab CI/CD Pipeline
-# Converted from .github/workflows (main.yml, backend.yml, frontend.yml)
-# Triggered on git tag pushes (equivalent to GitHub Actions on: push: tags: - '*')
-
 workflow:
   name: "CI/CD Pipeline"
   rules:
@@ -28,6 +25,7 @@ stages:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
+    - apk update && apk upgrade expat
     - apk add --no-cache aws-cli
     - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
@@ -35,6 +33,7 @@ stages:
   stage: deploy
   image: alpine:3.19
   before_script:
+    - apk update && apk upgrade expat
     - apk add --no-cache bash aws-cli jq
 
 # ---------------------------------------------------------------------------
