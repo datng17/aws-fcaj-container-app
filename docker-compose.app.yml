@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  backend:
+    container_name: backend
+    env_file:
+      - "./docker-compose-env/backend.app.env"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - /app/node_modules
+      - ./backend:/app
+    ports:
+      - "5000:5000"
+    networks:
+      - fcaj-network
+
+  frontend:
+    container_name: frontend
+    stdin_open: true
+    depends_on:
+      - backend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - /app/node_modules
+      - ./frontend:/app
+    ports:
+      - "3000:80" 
+    networks:
+      - fcaj-network
+
+networks:
+  fcaj-network:
+    driver: bridge

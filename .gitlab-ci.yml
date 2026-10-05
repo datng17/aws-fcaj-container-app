@@ -1,0 +1,84 @@
+# GitLab CI/CD Pipeline
+# Converted from .github/workflows (main.yml, backend.yml, frontend.yml)
+# Triggered on git tag pushes (equivalent to GitHub Actions on: push: tags: - '*')
+
+workflow:
+  name: "CI/CD Pipeline"
+  rules:
+    - if: $CI_COMMIT_TAG
+
+variables:
+  AWS_DEFAULT_REGION: $AWS_REGION
+  IMAGE_NAME_BE: "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${AWS_REGION}.amazonaws.com/${CI_PROJECT_BE_NAME}:${CI_COMMIT_REF_NAME}"
+  IMAGE_NAME_FE: "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${AWS_REGION}.amazonaws.com/${CI_PROJECT_FE_NAME}:${CI_COMMIT_REF_NAME}"
+
+stages:
+  - build
+  - deploy
+
+# ---------------------------------------------------------------------------
+# Reusable Templates
+# ---------------------------------------------------------------------------
+.docker-build-push:
+  stage: build
+  image: docker:24.0
+  services:
+    - docker:24.0-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - apk add --no-cache aws-cli
+    - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+.aws-deploy:
+  stage: deploy
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache bash aws-cli jq
+
+# ---------------------------------------------------------------------------
+# Backend Jobs
+# ---------------------------------------------------------------------------
+backend:build-and-push:
+  extends: .docker-build-push
+  script:
+    - cd backend
+    - docker build -f Dockerfile -t "$IMAGE_NAME_BE" .
+    - docker push "$IMAGE_NAME_BE"
+
+backend:deploy:
+  extends: .aws-deploy
+  needs:
+    - backend:build-and-push
+  variables:
+    TASK_NAME_BE: $TASK_NAME_BE
+    CLUSTER_NAME: $CLUSTER_NAME
+    SERVICE_NAME_BE: $SERVICE_NAME_BE
+    IMAGE_NAME_BE: $IMAGE_NAME_BE
+    REGION: $AWS_REGION
+  script:
+    - bash backend/deploy-backend.sh
+
+# ---------------------------------------------------------------------------
+# Frontend Jobs
+# ---------------------------------------------------------------------------
+frontend:build-and-push:
+  extends: .docker-build-push
+  script:
+    - cd frontend
+    - docker build -f Dockerfile.prod -t "$IMAGE_NAME_FE" .
+    - docker push "$IMAGE_NAME_FE"
+
+frontend:deploy:
+  extends: .aws-deploy
+  needs:
+    - frontend:build-and-push
+  variables:
+    TASK_NAME_FE: $TASK_NAME_FE
+    CLUSTER_NAME: $CLUSTER_NAME
+    SERVICE_NAME_FE: $SERVICE_NAME_FE
+    IMAGE_NAME_FE: $IMAGE_NAME_FE
+    REGION: $AWS_REGION
+  script:
+    - bash frontend/deploy-frontend.sh

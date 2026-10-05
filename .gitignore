@@ -1,0 +1,165 @@
+# Dependencies & Package Managers
+node_modules/
+*/node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Yarn & Plug'n'Play
+.pnp
+.pnp.js
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# pnpm
+.pnpm-store/
+
+
+# AWS & Cloud Credentials
+.aws/
+*.pem
+*.key
+credentials.json
+aws-credentials*
+
+
+# Build Outputs & Bundlers (Vite / CRA / Webpack / Transpilers)
+
+/dist/
+frontend/dist/
+frontend/dist-ssr/
+backend/dist/
+frontend/build/
+*.tsbuildinfo
+
+# Ensure public static assets in frontend are tracked
+!frontend/public/dist/
+
+
+# Runtime, Uploads & Static Storage
+
+# Multer uploads & dynamic files
+uploads/
+/backend/uploads/*
+backend/uploads/*
+!backend/uploads/.gitkeep
+!uploads/.gitkeep
+
+# Legacy / project-specific exclusions
+frontend/public/pages
+/extra
+
+# Temporary storage
+tmp/
+temp/
+*.tmp
+
+
+# Logs & Process Outputs
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+
+# Testing & Code Coverage
+
+/coverage/
+coverage/
+.nyc_output/
+*.lcov
+reports/
+*.coverage
+
+
+# Linter & Tooling Caches
+
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
+.vite/
+
+
+# Containers & Docker Overrides
+
+docker-compose.override.yml
+docker-compose.*.local.yml
+*.docker.local
+
+
+# Database Backups & Dumps (Keep init.sql)
+
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+!database/init.sql
+
+
+# Operating System Artifacts
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+
+
+# IDEs, Editors & AI Scratch Artifacts
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains / WebStorm
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Visual Studio
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Scratch & Temporary Notes
+scratch/
+.agent/scratch/
+
+# Agent
+.agent/
+.codesight/
