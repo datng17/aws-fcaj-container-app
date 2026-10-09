@@ -18,22 +18,20 @@ stages:
 # ---------------------------------------------------------------------------
 .docker-build-push:
   stage: build
-  image: docker:24.0
+  image: docker:latest
   services:
-    - docker:24.0-dind
+    - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk update && apk upgrade expat
     - apk add --no-cache aws-cli
     - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 .aws-deploy:
   stage: deploy
-  image: alpine:3.19
+  image: alpine:latest
   before_script:
-    - apk update && apk upgrade expat
     - apk add --no-cache bash aws-cli jq
 
 # ---------------------------------------------------------------------------
@@ -50,12 +48,6 @@ backend:deploy:
   extends: .aws-deploy
   needs:
     - backend:build-and-push
-  variables:
-    TASK_NAME_BE: $TASK_NAME_BE
-    CLUSTER_NAME: $CLUSTER_NAME
-    SERVICE_NAME_BE: $SERVICE_NAME_BE
-    IMAGE_NAME_BE: $IMAGE_NAME_BE
-    REGION: $AWS_REGION
   script:
     - bash backend/deploy-backend.sh
 
@@ -73,11 +65,5 @@ frontend:deploy:
   extends: .aws-deploy
   needs:
     - frontend:build-and-push
-  variables:
-    TASK_NAME_FE: $TASK_NAME_FE
-    CLUSTER_NAME: $CLUSTER_NAME
-    SERVICE_NAME_FE: $SERVICE_NAME_FE
-    IMAGE_NAME_FE: $IMAGE_NAME_FE
-    REGION: $AWS_REGION
   script:
     - bash frontend/deploy-frontend.sh
