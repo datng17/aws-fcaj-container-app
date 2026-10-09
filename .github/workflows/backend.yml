@@ -2,36 +2,21 @@ name: Backend CI/CD
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 env:
   IMAGE_NAME_BE: ${{ secrets.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.CI_PROJECT_BE_NAME }}:${{ github.ref_name }}
 
 jobs:
-  # this comment need when you implement in prod env (1)
-  # check_changes_backend:
-  #   runs-on: ubuntu-latest
-  #   outputs:
-  #     backend: ${{ steps.filter.outputs.backend }}
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - uses: dorny/paths-filter@v2
-  #       id: filter
-  #       with:
-  #         filters: |
-  #           backend:
-  #             - 'backend/**'
-
   build-and-push:
-    # this comment need when you implement in prod env (1)
-    # needs: check_changes_backend
-    # if: ${{ needs.check_changes_backend.outputs.backend == 'true' }}
+    name: Backend Build & Push
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -39,7 +24,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push image to Amazon ECR
         working-directory: ./backend
@@ -48,14 +33,15 @@ jobs:
           docker push ${{ env.IMAGE_NAME_BE }}
 
   deploy:
+    name: Backend Deploy
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -67,5 +53,5 @@ jobs:
           CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
           SERVICE_NAME_BE: ${{ secrets.SERVICE_NAME_BE }}
           IMAGE_NAME_BE: ${{ env.IMAGE_NAME_BE }}
-          REGION: ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: bash backend/deploy-backend.sh
