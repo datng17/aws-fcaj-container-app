@@ -3,13 +3,110 @@ name: CI/CD Pipeline
 on:
   push:
     tags:
-      - '*'
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  IMAGE_NAME_BE: ${{ secrets.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.CI_PROJECT_BE_NAME }}:${{ github.ref_name }}
+  IMAGE_NAME_FE: ${{ secrets.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.CI_PROJECT_FE_NAME }}:${{ github.ref_name }}
 
 jobs:
-  frontend:
-    uses: ./.github/workflows/frontend.yml
-    secrets: inherit
+  # Backend Jobs
+  backend-build-and-push:
+    name: Backend Build & Push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  backend:
-    uses: ./.github/workflows/backend.yml
-    secrets: inherit
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Backend Docker image
+        working-directory: ./backend
+        run: |
+          docker build -f Dockerfile -t ${{ env.IMAGE_NAME_BE }} .
+          docker push ${{ env.IMAGE_NAME_BE }}
+
+  backend-deploy:
+    name: Backend Deploy
+    needs: backend-build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy Backend to Amazon ECS
+        env:
+          TASK_NAME_BE: ${{ secrets.TASK_NAME_BE }}
+          CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+          SERVICE_NAME_BE: ${{ secrets.SERVICE_NAME_BE }}
+          IMAGE_NAME_BE: ${{ env.IMAGE_NAME_BE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: bash backend/deploy-backend.sh
+
+  # Frontend Jobs
+  frontend-build-and-push:
+    name: Frontend Build & Push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Frontend Docker image
+        working-directory: ./frontend
+        run: |
+          docker build -f Dockerfile.prod -t ${{ env.IMAGE_NAME_FE }} .
+          docker push ${{ env.IMAGE_NAME_FE }}
+
+  frontend-deploy:
+    name: Frontend Deploy
+    needs: frontend-build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy Frontend to Amazon ECS
+        env:
+          TASK_NAME_FE: ${{ secrets.TASK_NAME_FE }}
+          CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+          SERVICE_NAME_FE: ${{ secrets.SERVICE_NAME_FE }}
+          IMAGE_NAME_FE: ${{ env.IMAGE_NAME_FE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: bash frontend/deploy-frontend.sh
