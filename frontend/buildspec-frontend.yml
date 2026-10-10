@@ -1,0 +1,90 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "==> [Install Phase] Validating required CLI tools..."
+      - which jq >/dev/null 2>&1 || (yum install -y jq 2>/dev/null || apk add --no-cache jq 2>/dev/null || apt-get install -y jq 2>/dev/null || true)
+      - docker --version
+      - aws --version
+
+  pre_build:
+    commands:
+      - echo "==> [Pre-Build Phase] Setting up environment and authenticating with Amazon ECR..."
+      # Fallback resolution for AWS Region & Account ID
+      - AWS_REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}
+      - AWS_ACCOUNT_NUMBER=${AWS_ACCOUNT_NUMBER:-${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}}
+
+      # Determine Image Tag from source version or commit hash
+      - COMMIT_HASH=$(echo ${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest} | cut -c 1-7)
+      - |
+        if [ -n "$CODEBUILD_SOURCE_VERSION" ] && [ "$CODEBUILD_SOURCE_VERSION" != "$CODEBUILD_RESOLVED_SOURCE_VERSION" ]; then
+          REF_NAME=$(echo "$CODEBUILD_SOURCE_VERSION" | sed 's|refs/tags/||; s|refs/heads/||')
+          IMAGE_TAG=${IMAGE_TAG:-$REF_NAME}
+        else
+          IMAGE_TAG=${IMAGE_TAG:-$COMMIT_HASH}
+        fi
+
+      # Construct ECR Repository and Image URIs
+      - ECR_REGISTRY="${AWS_ACCOUNT_NUMBER}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+      - IMAGE_NAME_FE="${ECR_REGISTRY}/${CI_PROJECT_FE_NAME}:${IMAGE_TAG}"
+      - IMAGE_NAME_FE_LATEST="${ECR_REGISTRY}/${CI_PROJECT_FE_NAME}:latest"
+
+      - echo "[+] AWS Region: $AWS_REGION"
+      - echo "[+] AWS Account Number: $AWS_ACCOUNT_NUMBER"
+      - echo "[+] ECR Repository: $CI_PROJECT_FE_NAME"
+      - echo "[+] Image Tag: $IMAGE_TAG"
+      - echo "[+] Image URI: $IMAGE_NAME_FE"
+
+      # Login to Amazon ECR
+      - echo "[+] Authenticating Docker against Amazon ECR..."
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+  build:
+    commands:
+      - echo "==> [Build Phase] Building Frontend Docker Image..."
+      - |
+        if [ -d "frontend" ]; then
+          echo "[+] Changing directory to frontend..."
+          cd frontend
+        fi
+      - echo "[+] Building production Docker image with Dockerfile.prod..."
+      - docker build -f Dockerfile.prod -t "$IMAGE_NAME_FE" -t "$IMAGE_NAME_FE_LATEST" .
+
+  post_build:
+    commands:
+      - echo "==> [Post-Build Phase] Pushing Docker image to Amazon ECR..."
+      - docker push "$IMAGE_NAME_FE"
+      - docker push "$IMAGE_NAME_FE_LATEST"
+      - echo "[✓] Docker image successfully pushed to ECR."
+
+      # Create imagedefinitions.json for AWS CodePipeline ECS Deployment
+      - echo "[+] Creating imagedefinitions.json..."
+      - printf '[{"name":"%s","imageUri":"%s"}]' "${TASK_NAME_FE:-frontend}" "$IMAGE_NAME_FE" > imagedefinitions.json
+      - |
+        if [ -n "${CODEBUILD_SRC_DIR:-}" ] && [ -d "$CODEBUILD_SRC_DIR" ]; then
+          cp imagedefinitions.json "$CODEBUILD_SRC_DIR/imagedefinitions.json"
+        fi
+      - cat imagedefinitions.json
+
+      # Optional direct ECS deployment using deploy-frontend.sh if cluster variables are set
+      - |
+        if [ -n "${CLUSTER_NAME:-}" ] && [ -n "${SERVICE_NAME_FE:-}" ] && [ -n "${TASK_NAME_FE:-}" ]; then
+          echo "[+] ECS deployment variables detected. Running frontend ECS deployment script..."
+          export TASK_NAME_FE
+          export CLUSTER_NAME
+          export SERVICE_NAME_FE
+          export IMAGE_NAME_FE
+          export AWS_REGION
+          if [ -f "deploy-frontend.sh" ]; then
+            bash deploy-frontend.sh
+          elif [ -f "frontend/deploy-frontend.sh" ]; then
+            bash frontend/deploy-frontend.sh
+          fi
+        else
+          echo "[i] Skipping direct ECS deployment. Image definitions artifact ready for CodePipeline."
+        fi
+
+artifacts:
+  files:
+    - imagedefinitions.json
